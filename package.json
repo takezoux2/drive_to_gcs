@@ -1,0 +1,24 @@
+{
+  "name": "drive_to_gcs",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.7.9",
+    "nodemon": "^3.1.7",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@google-cloud/storage": "^7.13.0",
+    "express": "^4.21.1",
+    "googleapis": "^144.0.0"
+  },
+  "scripts": {
+    "copy": "ts-node src/copy_drive_to_gcs.ts",
+    "auth": "ts-node-dev src/get_google_access_token.ts"
+  }
+}
