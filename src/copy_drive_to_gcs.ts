@@ -2,22 +2,35 @@ import { Storage } from "@google-cloud/storage";
 import type { OAuth2Client } from "google-auth-library";
 import { type drive_v3, google } from "googleapis";
 import { Readable } from "node:stream";
+import dotenv from "dotenv";
+dotenv.config();
 
 const shareDriveId = process.env.SHARE_DRIVE_ID ?? "";
 const folderId = process.env.FOLDER_ID ?? "";
-const bucketName = process.env.BUCKET_NAME ?? "";
+const bucketName = process.env.GCS_BUCKET_NAME ?? "";
+const dryRun = process.env.DRY_RUN === "true";
+console.log(
+  `shareDriveId: ${shareDriveId}, folderId: ${folderId}, bucketName: ${bucketName}`
+);
 
 const run = async () => {
   const auth = await getAuthClient();
   const drive = google.drive({ version: "v3", auth });
+  const storage = new Storage({ authClient: auth });
 
-  const ite = listFiles(folderId, shareDriveId, drive, auth);
+  const ite = listFiles({ folderId, shareDriveId, drive });
 
   // loop ite
   for await (const file of ite) {
     console.log(file);
     if (file.id) {
-      await copyDocumentToGCSAsMarkdown(file.id, bucketName, auth);
+      await copyDocumentToGCSAsMarkdown({
+        documentId: file.id,
+        bucketName,
+        auth,
+        drive,
+        storage,
+      });
     }
   }
 };
@@ -34,35 +47,52 @@ const getAuthClient = async () => {
   return auth;
 };
 
-const copyDocumentToGCSAsMarkdown = async (
-  documentId: string,
-  bucketName: string,
-  auth: OAuth2Client
-) => {
-  const drive = google.drive({ version: "v3", auth });
-  const storage = new Storage({ authClient: auth });
-
+const copyDocumentToGCSAsMarkdown = async ({
+  documentId,
+  bucketName,
+  drive,
+  storage,
+}: {
+  documentId: string;
+  bucketName: string;
+  auth: OAuth2Client;
+  drive: drive_v3.Drive;
+  storage: Storage;
+}) => {
   try {
     const document = await drive.files.get({
       fileId: documentId,
-      fields: "id,name",
+      fields: "id,name,modifiedTime",
       supportsAllDrives: true,
-      // driveId: "0AFWfZVJiXutxUk9PVA",
     });
     const filename = `${document.data.id}.md`;
+    // GCS のバケットとファイルを指定します。
+    const bucket = storage.bucket(bucketName);
+    const blob = bucket.file(filename);
 
+    const [existsInGcs] = await blob.exists();
+
+    if (
+      existsInGcs &&
+      new Date(document.data.modifiedTime ?? 0) <
+        new Date(blob.metadata.updated ?? 0)
+    ) {
+      console.log(`Skip: ${document.data.name} is not updated`);
+      return;
+    }
+    console.log(
+      `Copying File:${document.data.name} to ${bucketName}/${filename}`
+    );
+    // DryRunの場合、ファイルのコピーをスキップします。
+    if (dryRun) {
+      return;
+    }
     // Drive からファイルをダウンロードするためのストリームを作成します。
     const driveFileStream = await drive.files.export(
       { fileId: documentId, mimeType: "text/markdown" },
       { responseType: "stream" }
     );
 
-    // GCS のバケットとファイルを指定します。
-    const bucket = storage.bucket(bucketName);
-    const blob = bucket.file(filename);
-    console.log(
-      `Copying File:${document.data.name} to ${bucketName}/${filename}`
-    );
     await blob.save(driveFileStream.data);
   } catch (err) {
     console.error("ファイルのコピー中にエラーが発生しました:", err);
@@ -70,12 +100,15 @@ const copyDocumentToGCSAsMarkdown = async (
 };
 
 // Googleドライブのフォルダの中のGoogleドキュメントを列挙する
-async function* listFiles(
-  folderId: string,
-  shareDriveId: string,
-  drive: drive_v3.Drive,
-  auth: OAuth2Client
-): AsyncGenerator<drive_v3.Schema$File> {
+async function* listFiles({
+  folderId,
+  shareDriveId,
+  drive,
+}: {
+  folderId: string;
+  shareDriveId: string;
+  drive: drive_v3.Drive;
+}): AsyncGenerator<drive_v3.Schema$File> {
   console.log(`Folder: ${folderId}`);
 
   try {
@@ -107,7 +140,7 @@ async function* listFiles(
       for (const folder of folders.data.files) {
         console.log(`Folder: ${folder.name}`);
         if (folder.id) {
-          yield* await listFiles(folder.id, shareDriveId, drive, auth);
+          yield* await listFiles({ folderId: folder.id, shareDriveId, drive });
         }
       }
     }
