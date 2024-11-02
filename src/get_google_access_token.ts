@@ -5,7 +5,7 @@ import fs from "node:fs";
 const app = express();
 
 const getAuth2Token = async () => {
-  const credentials = require("./credentials.json");
+  const credentials = require("../secrets/credentials.json");
   const oauth2Client = new google.auth.OAuth2({
     clientId: credentials.installed.client_id,
     clientSecret: credentials.installed.client_secret,
@@ -43,12 +43,13 @@ const getAuth2Token = async () => {
       const accessToken = tokens.access_token;
       console.log(accessToken);
 
+      // save token\
+      fs.writeFileSync("./secrets/token.json", JSON.stringify(tokens));
+
       res.send(`<html><body>認証に成功しました！<br />
         secrets/token.jsonに保存しました。<br />
         ${JSON.stringify(tokens)}</body></html>
         `);
-      // save token\
-      fs.writeFileSync("../secrets/token.json", JSON.stringify(tokens));
     } catch (err) {
       console.error("エラー:", err);
       res.status(500).send("認証に失敗しました。");
