@@ -1,6 +1,7 @@
 
 secrets/credentials.json
 secrets/token.json
+secrets/slack_token.json
 
 # Logs
 logs
@@ -132,3 +133,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+
+download/
