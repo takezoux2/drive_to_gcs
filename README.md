@@ -42,3 +42,24 @@ yarn copy
 ```
 
 を実行してください。
+
+## Slack からの File の取得時の設定
+
+[参考記事](https://qiita.com/kobayashi_ryo/items/a194e620b49edad27364)に従って、SlackAPP を作成し、BotToken を作って、slack_token.json の BotToken を設定してください。
+
+1. Slack にファイル取得用の App を作成
+2. SlackApp の設定画面で "OAuth & Permissions" > "Scopes" > "Bot Token Scopes"に、"files:read"権限を追加
+3. SlackApp の設定画面で "OAuth & Permissions" > "OAuth Tokens"で、ワークスペースに App をインストール
+4. 生成された”Bot User OAuth Token"を、`.env`の`BOT_USER_OAUTH_TOKEN`に設定
+5. ファイルを取得したいチャンネルに、Slack のチャンネルの設定 > "インテグレーション" > "App"で、先ほど作成した App を追加
+
+を行ってください
+
+## Slack の特定チャンネルのファイルをすべてローカルにダウンロード
+
+```
+yarn ts-node src/download_slack_files_to_local.ts {ChannelID}
+```
+
+を実行してください。
+ChannelID は、Slack のチャンネル名の右クリック > リンクをコピーからコピーした URL の最末尾が ChannelID です。
